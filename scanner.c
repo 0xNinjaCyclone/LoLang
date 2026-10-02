@@ -448,7 +448,8 @@ LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
 }
 
 LoLVoid lol_lexer_dntok(LoLToken **ppTok) {
-
+    free( *ppTok );
+    ( *ppTok ) = NULL;
 }
 
 LoLVoid lol_lexer_done(LoLexer **ppLexer) {

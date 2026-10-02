@@ -23,6 +23,7 @@ LoLInt main(LoLInt nArg, LoLStrArr cpArgArr) {
         puts( "Parsing ..." );
         if ( pLoLAst = lol_parser_launch(pParser) ) {
             tree_print( pLoLAst );
+            tree_cleanup( &pLoLAst );
             puts( "Don3 successfully -_-" );
         }
     }

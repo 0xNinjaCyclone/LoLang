@@ -103,6 +103,9 @@ static LoLVoid lol_parser_printnode(LoLPtr ppNode) {
 }
 
 static LoLVoid lol_parser_freenode(LoLPtr ppNode) {
+    if ( (*(LoLNode **) ppNode)->value )
+        free( (*(LoLNode **) ppNode)->value );
+        
     free( *(LoLPtr **) ppNode );
     free( ppNode );
 }
