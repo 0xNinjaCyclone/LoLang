@@ -67,6 +67,16 @@ static LoLToken *lol_lexer_mktok(LoLexer *pLexer, LoLTokenType tok_type, LoLValu
     return pTok;
 }
 
+static LoLToken *lol_lexer_err(LoLexer *pLexer, LoLStr szErr, LoLDWord dwLine, LoLQWord qwPos) {
+    return lol_lexer_mktok(
+        pLexer,
+        TOK_ERROR,
+        (LoLValue) lol_strdup( szErr, strlen(szErr) ),
+        dwLine,
+        qwPos
+    );
+}
+
 static LoLToken *lol_lexer_identifier(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwPos) {
     LoLStr szKwd;
     LoLStr szPtr;
@@ -81,10 +91,10 @@ static LoLToken *lol_lexer_identifier(LoLexer *pLexer, LoLDWord dwLine, LoLQWord
     wLen = pLexer->qwPos - qwPos;
     
     if ( wLen > LEXER_MAX_IDENTIFIER_LEN )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Too Long Identifier", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Too Long Identifier", dwLine, qwPos );
     
     if ( !(szKwd = (LoLStr) malloc(wLen + 1)) )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Out Of Memory", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Out Of Memory", dwLine, qwPos );
 
     memcpy( szKwd, szPtr, wLen );
     *( szKwd + wLen ) = LEXER_NUL;
@@ -106,7 +116,7 @@ static LoLToken *lol_lexer_string(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
     q = LEXER_READ( pLexer );
 
     if ( !(q == LEXER_DQUOTE || q == LEXER_SQUOTE) )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLPtr) "Invalid string (no openning quote)", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Invalid string (no openning quote)", dwLine, qwPos );
 
     lol_lexer_walk( pLexer );
     szPtr = pLexer->sBuff;
@@ -124,10 +134,10 @@ static LoLToken *lol_lexer_string(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
     }
 
     if ( c != q )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLPtr) "Invalid string (no closing quote)", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Invalid string (no closing quote)", dwLine, qwPos );
 
     if ( !(szStr = (LoLStr) malloc(qwStrLen + 1)) )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLPtr) "Out Of Memory", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Out Of Memory", dwLine, qwPos );
 
     value = (LoLValue) szStr;
 
@@ -194,13 +204,13 @@ static LoLToken *lol_lexer_number(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
     }
 
     if ( !(szNum = (LoLStr) malloc(qwLen + 1)) )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Out Of Memory", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Out Of Memory", dwLine, qwPos );
 
     memcpy( szNum, szPtr, qwLen );
     *( szNum + qwLen ) = LEXER_NUL;
 
     if ( !(value = (LoLQWord) malloc(sizeof(LoLQWord))) )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Out Of Memory", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "Out Of Memory", dwLine, qwPos );
 
     *( (LoLQWord *) value ) = atof( szNum );
     return lol_lexer_mktok( pLexer, bFloat ? TOK_FLOAT : TOK_INT, (LoLValue) value, dwLine, qwPos );
@@ -415,7 +425,7 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
         }
     }
 
-    return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Invalid code!", dwLine, qwPos );
+    return lol_lexer_err( pLexer, "Invalid code!", dwLine, qwPos );
 }
 
 LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
@@ -443,7 +453,7 @@ LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
     }
 
     if ( !(szPath = (LoLStr) malloc(wLen + 1)) )
-        return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "OOM!", dwLine, qwPos );
+        return lol_lexer_err( pLexer, "OOM!", dwLine, qwPos );
 
     memcpy( szPath, szPtr, wLen );
     *( szPath + wLen ) = LEXER_NUL;

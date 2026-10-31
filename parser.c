@@ -132,7 +132,9 @@ static TreeNode *lol_parser_block(LoLParser *pParser, Tree *pLoLAst, TreeNode *p
         lol_parser_skip( pParser );
         if ( pParser->pCur->type == TOK_RBRACE || pParser->pCur->type == TOK_EOF )
             break;
-        lol_parser_stmt( pParser, pLoLAst, pNode );
+
+        if ( !lol_parser_stmt(pParser, pLoLAst, pNode) )
+            return NULL;
     }
 
     lol_parser_expect( pParser, TOK_RBRACE, "expected '}' to close block" );
