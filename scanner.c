@@ -1,7 +1,7 @@
 
 #include "lolang.h"
 
-LoLKeyword kwds[] = {
+LoLKeyword g_aKwds[] = {
     { "nothing", TOK_NOTHING },
     { "if",      TOK_IF },
     { "else",    TOK_ELSE },
@@ -89,7 +89,7 @@ static LoLToken *lol_lexer_identifier(LoLexer *pLexer, LoLDWord dwLine, LoLQWord
     memcpy( szKwd, szPtr, wLen );
     *( szKwd + wLen ) = LEXER_NUL;
     
-    for ( LoLKeyword *pKwd = kwds; pKwd->szWord; pKwd++ ) 
+    for ( LoLKeyword *pKwd = g_aKwds; pKwd->szWord; pKwd++ ) 
         if ( wLen == strlen(pKwd->szWord) && strncmp(pKwd->szWord, szKwd, wLen) == 0 )
             return lol_lexer_mktok( pLexer, pKwd->tok_type, (LoLValue) szKwd, dwLine, qwPos);
 
@@ -115,6 +115,9 @@ static LoLToken *lol_lexer_string(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
     while ( LEXER_CANREAD(pLexer) && (c = LEXER_READ(pLexer)) != q ) {
         if ( c == LEXER_BACKSLASH && (pLexer->qwSize - pLexer->qwPos) > 2 )
             lol_lexer_walk( pLexer );
+
+        if ( c == LEXER_LF )
+            break;
 
         qwStrLen++;
         lol_lexer_walk( pLexer );
@@ -412,7 +415,7 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
         }
     }
 
-    return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Invalid value!", dwLine, qwPos );
+    return lol_lexer_mktok( pLexer, TOK_ERROR, (LoLValue) "Invalid code!", dwLine, qwPos );
 }
 
 LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
@@ -431,8 +434,8 @@ LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
     while ( 
         LEXER_CANREAD(pLexer) && 
         ( c = LEXER_READ(pLexer) ) && (
-            isalnum(c) || c == '_' ||
-           c == '.' || c == '/' || c == '-'
+            isalnum(c) || c == LEXER_USCORE ||
+           c == LEXER_DOT || c == LEXER_SLASH || c == LEXER_NEGSIGN
         )
     ) {
         lol_lexer_walk( pLexer );
@@ -448,11 +451,16 @@ LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
 }
 
 LoLVoid lol_lexer_dntok(LoLToken **ppTok) {
-    free( *ppTok );
-    ( *ppTok ) = NULL;
+    if ( *ppTok ) {
+        if ( (*ppTok)->value )
+            free( (*ppTok)->value );
+        free( *ppTok );
+        ( *ppTok ) = NULL;
+    }
 }
 
 LoLVoid lol_lexer_done(LoLexer **ppLexer) {
-    free( *ppLexer );
+    if ( *ppLexer )
+        free( *ppLexer );
     ( *ppLexer ) = LOL_NULL;
 }

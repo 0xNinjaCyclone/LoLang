@@ -1,8 +1,8 @@
 
 #include "lolang.h"
 
-LoLCStr lol_readfile(LoLCStr szFName, LoLQWord *pqwSize) {
-    LoLStr szBuf;
+LoLBytes lol_readfile(LoLCStr szFName, LoLQWord *pqwSize) {
+    LoLBytes pBuff;
     FILE *fp;
     LoLQWord qwSize;
 
@@ -13,18 +13,18 @@ LoLCStr lol_readfile(LoLCStr szFName, LoLQWord *pqwSize) {
     qwSize = ftell( fp );
     fseek( fp, 0L, SEEK_SET );
 
-    if ( szBuf = (LoLStr) malloc(qwSize) )
-        fread( szBuf, qwSize, 1, fp );
+    if ( pBuff = (LoLBytes) malloc(qwSize) )
+        fread( pBuff, qwSize, 1, fp );
 
     fclose( fp );
     
     if ( pqwSize )
         ( *pqwSize ) = qwSize;
         
-    return szBuf;
+    return pBuff;
 }
 
-LoLCStr op_name(LoLOpKind op) {
+LoLCStr lol_op_name(LoLOpKind op) {
     switch (op) {
         case OP_ASSIGN: return "=";
         case OP_ADD_ASSIGN: return "+=";
@@ -65,4 +65,27 @@ LoLCStr op_name(LoLOpKind op) {
         case OP_BIT_XOR: return "^";
     }
     return "?";
+}
+
+LoLStr lol_strdup(LoLStr sSrc, LoLQWord qwSize) {
+    LoLStr s, p;
+
+    if ( p = s = (LoLStr) malloc( qwSize + 1 ) ) {
+        while ( qwSize-- )
+            *s++ = *sSrc++;
+            
+        *s++ = LEXER_NUL;
+    }
+
+    return p;
+}
+
+LoLBytes lol_memdup(LoLBytes pSrc, LoLQWord qwSize) {
+    LoLBytes p, t;
+
+    if ( t = p = (LoLBytes) malloc(qwSize) )
+        while ( qwSize-- )
+            *t++ = *pSrc++;
+
+    return p;
 }

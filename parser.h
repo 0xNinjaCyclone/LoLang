@@ -57,6 +57,11 @@ typedef enum {
     
 } LoLOpKind;
 
+typedef struct _LoLErr {
+    LoLToken *pTok;
+    LoLStr szErr;
+} LoLErr;
+
 typedef struct _LoLNode {
     LoLNodeKind kind;
     LoLOpKind op_kind;
@@ -70,6 +75,7 @@ typedef struct _LoLParser {
     LoLToken *pCur;
     LoLToken *pPrev;
     LoLBool bErr;
+    List *pErrs;
     LoLStr szFName;
     LoLStr sSrc;
     LoLQWord qwSize;
@@ -87,5 +93,9 @@ LoLVoid lol_parser_skip(LoLParser *pParser);
 LoLVoid lol_parser_done(LoLParser **ppParser);
 
 static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode);
+
+LoLVoid lol_err_register(LoLParser *pParser, LoLToken *pTok, LoLStr szErrMsg);
+LoLVoid lol_err_print(LoLPtr pErr);
+LoLVoid lol_err_free(LoLPtr pErr);
 
 #endif
