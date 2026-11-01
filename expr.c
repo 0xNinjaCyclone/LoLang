@@ -105,11 +105,11 @@ static TreeNode *lol_expr_primary(LoLParser *pParser, Tree *pLoLAst) {
 
                 PARSER_NEXT( pParser );
                 lol_parser_expr( pParser, pLoLAst, pChild );
+                tree_insert2( pLoLAst, pNode, pChild );
                 if ( pParser->pCur->type != TOK_COMMA )
                     break;
                     
                 PARSER_NEXT( pParser );
-                tree_insert2( pLoLAst, pNode, pChild );
             }
 
         lol_parser_skip( pParser );
