@@ -151,12 +151,14 @@ static TreeNode *lol_expr_postfix(LoLParser *pParser, Tree *pLoLAst) {
                     /* Args */
                     if ( pParser->pCur->type != TOK_RPAREN )
                         while ( LOL_TRUE ) {
+                            lol_parser_skip( pParser );
                             lol_parser_expr( pParser, pLoLAst, pNode );
                             if ( pParser->pCur->type != TOK_COMMA )
                                 break;
                             PARSER_NEXT( pParser );
                         }
                     
+                    lol_parser_skip( pParser );
                     if ( pParser->pCur->type != TOK_RPAREN ) {
                         /* Err: function calls must end with ) */
                         lol_err_register( pParser, pParser->pCur, "function calls must end with ')'" );
@@ -472,8 +474,11 @@ static TreeNode *lol_expr_eq(LoLParser *pParser, Tree *pLoLAst) {
     if ( pLeft = lol_expr_relational(pParser, pLoLAst) ) {
         t = pParser->pCur->type;
 
-        while ( t == TOK_EQ || t == TOK_NEQ || t == TOK_KW_EQ || t == TOK_KW_NE ) {
-            pLoLNode = lol_parser_newnode( pParser->pCur, N_BINOP, (t == TOK_EQ || t == TOK_KW_EQ) ? OP_EQ : OP_NE );
+        while ( t == TOK_EQ || t == TOK_NEQ || t == TOK_KW_EQ || t == TOK_KW_NE || t == TOK_IN ) {
+            if ( t == TOK_IN )
+                pLoLNode = lol_parser_newnode( pParser->pCur, N_BINOP, OP_IN );
+            else
+                pLoLNode = lol_parser_newnode( pParser->pCur, N_BINOP, (t == TOK_EQ || t == TOK_KW_EQ) ? OP_EQ : OP_NE );
             PARSER_NEXT( pParser );
             pNode = tree_node_create( pLoLAst, &pLoLNode );
             tree_insert2( pLoLAst, pNode, pLeft );

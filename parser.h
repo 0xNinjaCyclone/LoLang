@@ -8,7 +8,13 @@
     lol_parser_next( p, lol_lexer_scan )
 
 #define PARSER_NEXT_PATH(p) \
-    lol_parser_next( p, lol_lexer_scanpath );
+    lol_parser_next( p, lol_lexer_scanpath )
+
+#define LOL_MOD_EXPOSED   0x01
+#define LOL_MOD_GUARDED   0x02
+#define LOL_MOD_HIDDEN    0x04
+#define LOL_MOD_STATIC    0x08
+#define LOL_MOD_ABSTRACT  0x10
 
 typedef enum {
     N_PROGRAM,
@@ -39,7 +45,15 @@ typedef enum {
     N_CALL,
     N_MEMBER,        /* target.member */
     N_INDEX,         /* target[index] */
-    N_MAP_PAIR       /* key: value, used inside N_LIT_MAP */
+    N_MAP_PAIR,      /* key: value, used inside N_LIT_MAP */
+
+    /* Object-oriented declarations */
+    N_CLASS,
+    N_IFACE,
+    N_FIELD,
+    N_METHOD,
+    N_BASE_CLASS,
+    N_IFACE_REF
 } LoLNodeKind;
 
 typedef enum {
@@ -53,7 +67,8 @@ typedef enum {
     OP_NEG, OP_NOT,
     OP_POST_INC, OP_POST_DEC, OP_PRE_INC, OP_PRE_DEC,
     OP_BIT_AND, OP_BIT_OR, OP_BIT_NOT, OP_BIT_XOR,
-    OP_BIT_SHL, OP_BIT_SHR
+    OP_BIT_SHL, OP_BIT_SHR,
+    OP_IN
     
 } LoLOpKind;
 

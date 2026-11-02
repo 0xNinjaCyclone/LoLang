@@ -47,7 +47,7 @@ static LoLVoid lol_parser_printnode(LoLPtr ppNode) {
             printf( "Need <%s>", (LoLStr) pLoLNode->value );
             break;
         case N_FUNC_DEF:
-            printf( "FuncDef %s", (LoLStr) pLoLNode->value );
+            printf( "FuncDef" );
             break;
         case N_RET:
             printf( "RET" );
@@ -62,7 +62,7 @@ static LoLVoid lol_parser_printnode(LoLPtr ppNode) {
             printf( "Int %lld", *(LoLQWord *) pLoLNode->value );
             break;
         case N_LIT_FLOAT:
-            printf( "Float %0.2f", (double)*(LoLQWord *) pLoLNode->value );
+            printf( "Float %0.2f", *(LoLFloat *) pLoLNode->value );
             break;
         case N_LIT_STRING:
             printf( "String \"%s\"", (LoLStr) pLoLNode->value );
@@ -97,6 +97,32 @@ static LoLVoid lol_parser_printnode(LoLPtr ppNode) {
         case N_MEMBER:
             printf( "Member" );
             break;
+        case N_CLASS:
+            printf( "Class %s", (LoLStr) pLoLNode->value );
+            break;
+        case N_IFACE:
+            printf( "Interface %s", (LoLStr) pLoLNode->value );
+            break;
+        case N_FIELD:
+            printf(
+                "Field %s [flags=0x%x]",
+                (LoLStr) pLoLNode->value,
+                (LoLDWord) pLoLNode->op_kind
+            );
+            break;
+        case N_METHOD:
+            printf(
+                "Method %s [flags=0x%x]",
+                (LoLStr) pLoLNode->value,
+                (LoLDWord) pLoLNode->op_kind
+            );
+            break;
+        case N_BASE_CLASS:
+            printf( "BaseClass %s", (LoLStr) pLoLNode->value );
+            break;
+        case N_IFACE_REF:
+            printf( "InterfaceRef %s", (LoLStr)pLoLNode->value );
+            break;
         default:
             printf( "<Unknown node %d>", pLoLNode->kind );
     }
@@ -124,7 +150,9 @@ static TreeNode *lol_parser_block(LoLParser *pParser, Tree *pLoLAst, TreeNode *p
     TreeNode *pNode;
     LoLNode *pLoLNode;
 
-    lol_parser_expect( pParser, TOK_LBRACE, "expected '{' to start a block" );
+    if ( !lol_parser_expect(pParser, TOK_LBRACE, "expected '{' to start a block") )
+        return LOL_NULL;
+
     pLoLNode = lol_parser_newnode( pParser->pPrev, N_BLOCK, OP_NOTHING );
     pNode = tree_insert( pLoLAst, pAstNode, &pLoLNode );
 
@@ -134,11 +162,10 @@ static TreeNode *lol_parser_block(LoLParser *pParser, Tree *pLoLAst, TreeNode *p
             break;
 
         if ( !lol_parser_stmt(pParser, pLoLAst, pNode) )
-            return NULL;
+            return LOL_NULL;
     }
 
-    lol_parser_expect( pParser, TOK_RBRACE, "expected '}' to close block" );
-    return pNode;
+    return lol_parser_expect( pParser, TOK_RBRACE, "expected '}' to close block" ) ? pNode : LOL_NULL;
 }
 
 static TreeNode *lol_parser_loopctrl(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
@@ -162,8 +189,13 @@ static TreeNode *lol_parser_if(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAst
     PARSER_NEXT( pParser );
     pLoLNode = lol_parser_newnode( pParser->pPrev, N_IF, OP_NOTHING );
     pNode = tree_node_create( pLoLAst, &pLoLNode );
-    lol_parser_expr( pParser, pLoLAst, pNode );
-    lol_parser_block( pParser, pLoLAst, pNode );
+    lol_parser_expect( pParser, TOK_LPAREN, "'(' expected after if keyword" ); 
+    if ( !lol_parser_expr(pParser, pLoLAst, pNode) )
+        return LOL_NULL;
+    if ( !lol_parser_expect(pParser, TOK_RPAREN, "')' expected before if block") )
+        return LOL_NULL;
+    if ( !lol_parser_block(pParser, pLoLAst, pNode) )
+        return LOL_NULL;
     lol_parser_skip( pParser );
     /* Check else and else if */
     if ( pParser->pCur->type == TOK_ELSE ) {
@@ -302,7 +334,7 @@ static TreeNode *lol_parser_define(LoLParser *pParser, Tree *pLoLAst, TreeNode *
     if ( pParser->pCur->type != TOK_IDENT ) {
         /* ????? */
         lol_err_register( pParser, pParser->pCur, "identifier expected after define keyword!" );
-        return NULL;
+        return LOL_NULL;
     }
 
     pLoLNode = lol_parser_newnode( pParser->pPrev, N_FUNC_DEF, OP_NOTHING );
@@ -310,14 +342,15 @@ static TreeNode *lol_parser_define(LoLParser *pParser, Tree *pLoLAst, TreeNode *
     pLoLNode = lol_parser_newnode( pParser->pCur, N_IDENT, OP_NOTHING );
     tree_insert( pLoLAst, pChild, &pLoLNode );
     PARSER_NEXT( pParser );
-    lol_parser_expect( pParser, TOK_LPAREN, "Func should has (), even if takes no params" );
+    if ( !lol_parser_expect(pParser, TOK_LPAREN, "Func should has (), even if takes no params") )
+        return LOL_NULL;
 
     if ( pParser->pCur->type != TOK_RPAREN )
         while ( LOL_TRUE ) {
             if ( pParser->pCur->type != TOK_IDENT ) {
                 /* Err: expect param name */
                 lol_err_register( pParser, pParser->pCur, "expected param identifiers!" );
-                return NULL;
+                return LOL_NULL;
             }
             pLoLNode = lol_parser_newnode( pParser->pCur, N_IDENT, OP_NOTHING );
             tree_insert( pLoLAst, pChild, &pLoLNode );
@@ -327,11 +360,276 @@ static TreeNode *lol_parser_define(LoLParser *pParser, Tree *pLoLAst, TreeNode *
             PARSER_NEXT( pParser );
         }
     
-    lol_parser_expect( pParser, TOK_RPAREN, "expected ')' after params" );
+    if ( !lol_parser_expect(pParser, TOK_RPAREN, "expected ')' after params") )
+        return LOL_NULL;
+
     pParser->dwFuncDepth++;
-    lol_parser_block( pParser, pLoLAst, pChild );
+    if ( !lol_parser_block(pParser, pLoLAst, pChild) )
+        return LOL_NULL;
     pParser->dwFuncDepth--;
     return pChild;
+}
+
+static LoLDWord lol_parser_oop_modifiers(LoLParser *pParser) {
+    LoLDWord fFlags = 0;
+    LoLDWord fVisibility = 0;
+    LoLDWord fBit;
+
+    while ( LOL_TRUE ) {
+
+        switch ( pParser->pCur->type ) {
+        case TOK_HIDDEN:
+            fBit = LOL_MOD_HIDDEN;
+            break;
+        case TOK_GUARDED:
+            fBit = LOL_MOD_GUARDED;
+            break;
+        case TOK_EXPOSED:
+            fBit = LOL_MOD_EXPOSED;
+            break;
+        case TOK_STATIC:
+            fBit = LOL_MOD_STATIC;
+            break;
+        case TOK_ABSTRACT:
+            fBit = LOL_MOD_ABSTRACT;
+            break;
+        default:
+            return fFlags;
+        }
+
+        if ( fBit == LOL_MOD_HIDDEN || fBit == LOL_MOD_GUARDED || fBit == LOL_MOD_EXPOSED ) {
+            if ( fVisibility ) {
+                lol_err_register(
+                    pParser, pParser->pCur,
+                    "only one access modifier is allowed"
+                );
+                return -1;
+            }
+            fVisibility = fBit;
+        }
+
+        if ( fFlags & fBit ) {
+            lol_err_register(
+                pParser, pParser->pCur,
+                "duplicate declaration modifier"
+            );
+            return -1;
+        }
+
+        fFlags |= fBit;
+        PARSER_NEXT( pParser );
+    }
+}
+
+static TreeNode *lol_parser_oop_method_decl(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode, LoLDWord fModifiers) {
+    LoLNode *pLoLNode;
+    TreeNode *pNode;
+
+    if ( !lol_parser_expect( pParser, TOK_DEFINE, "'define' expected before method name!" ) )
+        return LOL_NULL;
+
+    if ( pParser->pCur->type != TOK_IDENT ) {
+        lol_err_register(
+            pParser, pParser->pCur,
+            "method name expected after define"
+        );
+        return LOL_NULL;
+    }
+
+    pLoLNode = lol_parser_newnode( pParser->pCur, N_METHOD, (LoLOpKind) fModifiers );
+    pNode = tree_insert( pLoLAst, pAstNode, &pLoLNode );
+    PARSER_NEXT( pParser );
+
+    if ( !lol_parser_expect(pParser, TOK_LPAREN, "'(' expected after method name!") )
+        return LOL_NULL;
+
+    while( pParser->pCur->type != TOK_RPAREN && pParser->pCur->type != TOK_EOF ) {
+        if ( pParser->pCur->type != TOK_IDENT ) {
+            lol_err_register( pParser, pParser->pCur, "expected param identifiers!" );
+            return NULL;
+        }
+        pLoLNode = lol_parser_newnode( pParser->pCur, N_IDENT, OP_NOTHING );
+        tree_insert( pLoLAst, pNode, &pLoLNode );
+        PARSER_NEXT( pParser );
+        if ( pParser->pCur->type != TOK_COMMA )
+            break;
+        PARSER_NEXT( pParser );
+    }
+
+    if ( !lol_parser_expect(pParser, TOK_RPAREN, "')' expected after method params!") )
+        return LOL_NULL;
+
+    return pNode;
+}
+
+static TreeNode *lol_parser_oop_iface(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
+    LoLNode *pLoLNode;
+    TreeNode *pNode;
+    TreeNode *pChild;
+    LoLDWord fModifiers;
+
+    PARSER_NEXT( pParser );
+
+    if ( !lol_parser_expect( pParser, TOK_IDENT, "interface name expected!" ) )
+        return LOL_NULL;
+
+    if ( !(pLoLNode = lol_parser_newnode(pParser->pPrev, N_IFACE, OP_NOTHING)) )
+        return LOL_NULL;
+
+    if ( !(pNode = tree_insert(pLoLAst, pAstNode, &pLoLNode)) )
+        return LOL_NULL;
+
+    if ( !lol_parser_expect(pParser, TOK_LBRACE, "'{' expected to start interface body") )
+        return LOL_NULL;
+
+    if ( pParser->pCur->type != TOK_RBRACE && pParser->pCur->type != TOK_EOF )
+        while ( LOL_TRUE ) {
+            lol_parser_skip( pParser );
+            if ( !(pParser->pCur->type != TOK_RBRACE && pParser->pCur->type != TOK_EOF) )
+                break;
+            
+            fModifiers = lol_parser_oop_modifiers( pParser );
+            if ( (LoLBool) ~(fModifiers) == LOL_FALSE )
+                return LOL_NULL;
+
+            if ( pParser->pCur->type != TOK_DEFINE ) {
+                lol_err_register( pParser, pParser->pCur, "interface members must be method declarations" );
+                return LOL_NULL;
+            }
+            
+            if ( !lol_parser_oop_method_decl(pParser, pLoLAst, pNode, fModifiers) )
+                return LOL_NULL;
+
+            if ( pParser->pCur->type == TOK_LBRACE ) {
+                lol_err_register( pParser, pParser->pCur, "interface methods are just declarations, no method body expected!" );
+                return LOL_NULL;
+            }
+        }
+
+    PARSER_NEXT( pParser );
+    return pNode;
+}
+
+static TreeNode *lol_parser_oop_ident(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode, LoLNodeKind kind) {
+    LoLNode *pLoLNode;
+
+    if ( pParser->pCur->type != TOK_IDENT ) {
+        lol_err_register(
+            pParser, pParser->pCur,
+            "identifier expected in declaration"
+        );
+        return LOL_NULL;
+    }
+
+    pLoLNode = lol_parser_newnode( pParser->pCur, kind, OP_NOTHING );
+    PARSER_NEXT( pParser );
+    return tree_insert( pLoLAst, pAstNode, &pLoLNode );
+}
+
+static TreeNode *lol_parser_oop_class(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
+    LoLNode *pLoLNode;
+    TreeNode *pNode;
+    TreeNode *pChild;
+    LoLDWord fModifiers;
+
+    PARSER_NEXT( pParser );
+
+    if ( pParser->pCur->type != TOK_IDENT ) {
+        lol_err_register( pParser, pParser->pCur, "class name expected after 'class' keyword!" );
+        return LOL_NULL;
+    }
+
+    pLoLNode = lol_parser_newnode( pParser->pCur, N_CLASS, OP_NOTHING );
+    pNode = tree_insert( pLoLAst, pAstNode, &pLoLNode );
+    PARSER_NEXT( pParser );
+
+    /* Handle Inheritance */
+    if ( pParser->pCur->type == TOK_RIGHT_ARROW ) {
+        PARSER_NEXT( pParser );
+
+        do {
+            if ( !lol_parser_oop_ident(pParser, pLoLAst, pNode, N_BASE_CLASS) )
+                return LOL_NULL;
+            
+            if ( pParser->pCur->type != TOK_BIT_AND )
+                break;
+
+            PARSER_NEXT( pParser );
+        } while ( LOL_TRUE );
+    }
+
+    /* Handle Implementing Interfaces */
+    if ( pParser->pCur->type == TOK_LEFT_ARROW ) {
+        PARSER_NEXT( pParser );
+
+        do {
+            if ( !lol_parser_oop_ident(pParser, pLoLAst, pNode, N_IFACE_REF) )
+                return LOL_NULL;
+            
+            if ( pParser->pCur->type != TOK_BIT_AND )
+                break;
+
+            PARSER_NEXT( pParser );
+        } while ( LOL_TRUE );
+    }
+
+    if ( !lol_parser_expect(pParser, TOK_LBRACE, "'{' expected to start the class body!") )
+        return LOL_NULL;
+
+    if ( pParser->pCur->type != TOK_RBRACE && pParser->pCur->type != TOK_EOF )
+        while ( LOL_TRUE ) {
+            lol_parser_skip( pParser );
+            if ( !(pParser->pCur->type != TOK_RBRACE && pParser->pCur->type != TOK_EOF) )
+                break;
+            
+            fModifiers = lol_parser_oop_modifiers( pParser );
+            if ( (LoLBool) ~(fModifiers) == LOL_FALSE )
+                return LOL_NULL;
+
+            if ( pParser->pCur->type == TOK_DEFINE ) {
+                if ( !(pChild = lol_parser_oop_method_decl(pParser, pLoLAst, pNode, fModifiers)) )
+                    return LOL_NULL;
+
+                
+                if ( pParser->pCur->type != TOK_LBRACE ) {
+                    if ( !(fModifiers & LOL_MOD_ABSTRACT) ) {
+                        lol_err_register( pParser, pParser->pCur, "method body expected; use abstract for declarations" );
+                        return LOL_NULL;
+                    }
+                }
+
+                else {
+                    if ( fModifiers & LOL_MOD_ABSTRACT ) {
+                        lol_err_register( pParser, pParser->pCur, "abstract methods cannot have a body" );
+                        return LOL_NULL;
+                    }
+
+                    pParser->dwFuncDepth++;
+                    if ( !lol_parser_block(pParser, pLoLAst, pChild) )
+                        return LOL_NULL;
+                    pParser->dwFuncDepth--;
+                }
+            }
+            
+            else if ( pParser->pCur->type == TOK_IDENT ) {
+                pLoLNode = lol_parser_newnode( pParser->pCur, N_FIELD, (LoLOpKind) fModifiers );
+                pChild = tree_insert( pLoLAst, pNode, &pLoLNode );
+                PARSER_NEXT( pParser );
+                if ( pParser->pCur->type == TOK_ASSIGN ) {
+                    PARSER_NEXT( pParser );
+                    if ( !lol_parser_expr(pParser, pLoLAst, pChild) )
+                        return LOL_NULL;
+                }
+            }
+
+            else {
+                lol_err_register( pParser, pParser->pCur, "expected a field or method declaration!" );
+                return LOL_NULL;
+            }
+        }
+
+    PARSER_NEXT( pParser );
+    return pNode;
 }
 
 static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
@@ -376,6 +674,12 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
         }
 
         return lol_parser_ret( pParser, pLoLAst, pAstNode );
+
+    case TOK_IFACE:
+        return lol_parser_oop_iface( pParser, pLoLAst, pAstNode );
+
+    case TOK_CLASS:
+        return lol_parser_oop_class( pParser, pLoLAst, pAstNode );
 
     default:
         break;
@@ -444,7 +748,7 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
         break;
 
     default:
-        return pNode;
+        return pAstNode ? tree_insert2(pLoLAst, pAstNode, pNode) : pNode;
     }
 
     pLoLNode = *(LoLNode **) pNode->data;

@@ -9,23 +9,23 @@
 #define LEXER_SQUOTE '\''
 #define LEXER_DQUOTE '"'
 #define LEXER_USCORE '_'
-#define LEXER_WHITESPACE ' '
+#define LEXER_SPACE ' '
 #define LEXER_BACKSPACE '\b'
-#define LEXER_FORMAT '\f'
+#define LEXER_FORM_FEED '\f'
 #define LEXER_CR '\r'
 #define LEXER_LF '\n'
 #define LEXER_TAB '\t'
 #define LEXER_NUL '\0'
-#define LEXER_HASHTAG '#'
-#define LEXER_SLASH '/'
+#define LEXER_HASH '#'
+#define LEXER_FORWARD_SLASH '/'
 #define LEXER_PERCENT '%'
 #define LEXER_BACKSLASH '\\'
 #define LEXER_COMMA ','
 #define LEXER_COLON ':'
 #define LEXER_SEMICOLON ';'
 #define LEXER_DOT '.'
-#define LEXER_NEGSIGN '-'
-#define LEXER_POSSIGN '+'
+#define LEXER_DASH '-'
+#define LEXER_PLUS '+'
 #define LEXER_STAR '*'
 #define LEXER_EQUAL '='
 #define LEXER_LT '<'
@@ -42,7 +42,7 @@
 #define LEXER_OPENCBRACKET '{'
 #define LEXER_CLOSECBRACKET '}'
 
-#define LEXER_ISCOMMENT(pLexer) ( *pLexer->sBuff == LEXER_HASHTAG )
+#define LEXER_ISCOMMENT(pLexer) ( *pLexer->sBuff == LEXER_HASH )
 #define LEXER_ISNEWLINE(pLexer) ( *pLexer->sBuff == LEXER_LF || *pLexer->sBuff == LEXER_SEMICOLON )
 #define LEXER_ISWS(pLexer) ( *pLexer->sBuff <= 0x20 && !LEXER_ISNEWLINE(pLexer) )
 #define LEXER_CANREAD(pLexer) ( pLexer->qwPos < pLexer->qwSize )
@@ -66,6 +66,11 @@ typedef enum {
     TOK_NEED, TOK_DEFINE, TOK_RET, TOK_AND, TOK_OR,
     TOK_KW_EQ, TOK_KW_NE, TOK_KW_LT, TOK_KW_LE, TOK_KW_GT, TOK_KW_GE,
     TOK_NEXT, TOK_STOP, TOK_TRUE, TOK_FALSE,
+
+    /* OOP keywords */
+    TOK_CLASS, TOK_IFACE,
+    TOK_HIDDEN, TOK_GUARDED, TOK_EXPOSED,
+    TOK_STATIC, TOK_ABSTRACT,
 
     /* operators */
     TOK_ASSIGN,      /* =  */
@@ -92,6 +97,8 @@ typedef enum {
     TOK_BIT_NOT,      /* ~ */
     TOK_BIT_SHL,      /* << */
     TOK_BIT_SHR,      /* >> */
+    TOK_RIGHT_ARROW,  /* -> */
+    TOK_LEFT_ARROW,   /* <- */
 
     /* punctuation */
     TOK_LPAREN, TOK_RPAREN, TOK_LBRACE, TOK_RBRACE,

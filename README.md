@@ -16,6 +16,11 @@ LoLang is a lightweight programming language written in C, built **by hand witho
 - Increment/decrement and compound assignments
 - `need` for paths/modules
 - Comments and newline/`;` statement termination
+- Classes, fields, and methods.
+- Interfaces and interface implementation.
+- Single and multiple inheritance.
+- Access modifiers: hidden, guarded, and exposed.
+- Static and abstract methods.
 
 ## Why LoLang?
 
@@ -45,6 +50,11 @@ if (x > 20) {
 }
 ```
 
-## Status
+## Notes
 
-LoLang is an active learning and research project.
+- LoLang is still under development, and its syntax and features may change.
+- There is currently no runtime or virtual machine (VM).
+- The project currently focuses on the lexer, parser, and AST construction.
+- Some features may be incomplete or not yet functional.
+
+LoLang is a research and educational project currently under development; it is not yet ready for executing programs or for use in real-world operational environments.

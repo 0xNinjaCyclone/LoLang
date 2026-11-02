@@ -23,6 +23,14 @@ LoLKeyword g_aKwds[] = {
     { "le",      TOK_KW_LE },
     { "gt",      TOK_KW_GT },
     { "ge",      TOK_KW_GE },
+    /* OOP keywords */
+    { "class",    TOK_CLASS },
+    { "iface",    TOK_IFACE },
+    { "hidden",   TOK_HIDDEN },
+    { "guarded",  TOK_GUARDED },
+    { "exposed",  TOK_EXPOSED },
+    { "static",   TOK_STATIC },
+    { "abstract", TOK_ABSTRACT },
     { LOL_NULL, TOK_EOF }
 };
 
@@ -39,18 +47,49 @@ static LoLVoid lol_lexer_walk(LoLexer *pLexer) {
 }
 
 static LoLVoid lol_lexer_skip(LoLexer *pLexer) {
-    LoLBool b = LOL_FALSE;
+    LoLBool b;
     LoLChr c;
 
-    while ( LEXER_CANREAD(pLexer) && (LEXER_ISWS(pLexer) || (b = LEXER_ISCOMMENT(pLexer))) ) {
+    while ( LEXER_CANREAD(pLexer) ) {
+        c = LEXER_READ(pLexer);
+
+        /* Backslash line continuation */
+        if ( c == LEXER_BACKSLASH ) {
+            lol_lexer_walk( pLexer );
+
+            if ( !LEXER_CANREAD(pLexer) )
+                break;
+
+            c = LEXER_READ(pLexer);
+
+            if ( c == LEXER_LF || c == LEXER_CR ) {
+                lol_lexer_walk( pLexer );
+
+                if ( c == LEXER_CR &&
+                     LEXER_CANREAD(pLexer) &&
+                     LEXER_READ(pLexer) == LEXER_LF )
+                    lol_lexer_walk( pLexer );
+
+                continue;
+            }
+
+            break;
+        }
+
+        b = LEXER_ISCOMMENT( pLexer );
+        if ( !(LEXER_ISWS(pLexer) || b) )
+            break;
+
         lol_lexer_walk( pLexer );
 
         if ( b ) {
-            while ( LEXER_CANREAD(pLexer) && ((c = LEXER_READ(pLexer)) && c != LEXER_LF) )
+            while ( LEXER_CANREAD(pLexer) &&
+                    (c = LEXER_READ(pLexer)) &&
+                    c != LEXER_LF &&
+                    c != LEXER_CR )
                 lol_lexer_walk( pLexer );
-
-            b = LOL_FALSE;
         }
+
     }
 }
 
@@ -150,7 +189,7 @@ static LoLToken *lol_lexer_string(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
                     *szStr++ = LEXER_BACKSPACE;
                     break;
                 case 'f':
-                    *szStr++ = LEXER_FORMAT;
+                    *szStr++ = LEXER_FORM_FEED;
                     break;
                 case 'n':
                     *szStr++ = LEXER_LF;
@@ -163,7 +202,7 @@ static LoLToken *lol_lexer_string(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
                     break;
                 case LEXER_DQUOTE:
                 case LEXER_BACKSLASH:
-                case LEXER_SLASH:
+                case LEXER_FORWARD_SLASH:
                     *szStr++ = c;
                     break;
             }
@@ -192,6 +231,33 @@ static LoLToken *lol_lexer_number(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
     LoLQWord qwLen = LOL_ZERO;
     LoLBool bFloat = LOL_FALSE;
     LoLChr c;
+    LoLInt nBase = 10;
+
+    /* Support for different numeral systems */
+    if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == '0' ) {
+        lol_lexer_walk( pLexer );
+        c = LEXER_READ( pLexer );
+        if ( isalpha(c) ) {
+            lol_lexer_walk( pLexer );
+            switch( c ) {
+            case 'b':
+            case 'B':
+                nBase = 2;
+                break;
+
+            case 'x':
+            case 'X':
+                nBase = 16;
+                break;
+
+            default:
+                return lol_lexer_err( pLexer, "Invalid Number System!", dwLine, qwPos );
+            }
+        }
+
+        else /* Octal starts with 0 in LoLang just like in C */
+            nBase = 8;
+    }
 
     szPtr = pLexer->sBuff;
 
@@ -203,16 +269,26 @@ static LoLToken *lol_lexer_number(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
         lol_lexer_walk( pLexer );
     }
 
+    if ( bFloat && nBase != 10 )
+        return lol_lexer_err( pLexer, "floats can't be used with non-decimal number systems!", dwLine, qwPos );
+
     if ( !(szNum = (LoLStr) malloc(qwLen + 1)) )
         return lol_lexer_err( pLexer, "Out Of Memory", dwLine, qwPos );
 
     memcpy( szNum, szPtr, qwLen );
     *( szNum + qwLen ) = LEXER_NUL;
 
-    if ( !(value = (LoLQWord) malloc(sizeof(LoLQWord))) )
+    if ( !(value = (LoLQWord) malloc(sizeof(LoLQWord))) ) {
+        free( szNum );
         return lol_lexer_err( pLexer, "Out Of Memory", dwLine, qwPos );
+    }
 
-    *( (LoLQWord *) value ) = atof( szNum );
+    if ( bFloat )
+        *( (LoLFloat *) value ) = strtod( szNum, LOL_NULL );
+
+    else 
+        *( (LoLQWord *) value ) = strtoull( szNum, LOL_NULL, nBase );
+        
     return lol_lexer_mktok( pLexer, bFloat ? TOK_FLOAT : TOK_INT, (LoLValue) value, dwLine, qwPos );
 }
 
@@ -262,7 +338,7 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
         case LEXER_LF:
             return lol_lexer_mktok( pLexer, TOK_NEWLINE, LOL_NULL, dwLine, qwPos );
 
-        case LEXER_SLASH:
+        case LEXER_FORWARD_SLASH:
             if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_EQUAL ) {
                 lol_lexer_walk( pLexer );
                 return lol_lexer_mktok( pLexer, TOK_DIV_ASSIGN, LOL_NULL, dwLine, qwPos );
@@ -284,8 +360,8 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
         case LEXER_COLON:
             return lol_lexer_mktok( pLexer, TOK_COLON, LOL_NULL, dwLine, qwPos );
 
-        case LEXER_NEGSIGN:
-            if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_NEGSIGN ) {
+        case LEXER_DASH:
+            if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_DASH ) {
                 lol_lexer_walk( pLexer );
                 return lol_lexer_mktok( pLexer, TOK_DEC, LOL_NULL, dwLine, qwPos );
             } 
@@ -295,10 +371,15 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
                 return lol_lexer_mktok( pLexer, TOK_SUB_ASSIGN, LOL_NULL, dwLine, qwPos );
             } 
 
+            if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_GT ) {
+                lol_lexer_walk( pLexer );
+                return lol_lexer_mktok( pLexer, TOK_RIGHT_ARROW, LOL_NULL, dwLine, qwPos );
+            } 
+
             return lol_lexer_mktok( pLexer, TOK_MINUS, LOL_NULL, dwLine, qwPos );
 
-        case LEXER_POSSIGN:
-            if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_POSSIGN ) {
+        case LEXER_PLUS:
+            if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_PLUS ) {
                 lol_lexer_walk( pLexer );
                 return lol_lexer_mktok( pLexer, TOK_INC, LOL_NULL, dwLine, qwPos );
             } 
@@ -393,6 +474,11 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
                 return lol_lexer_mktok( pLexer, TOK_LE, LOL_NULL, dwLine, qwPos );
             }
 
+            if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == LEXER_DASH ) {
+                lol_lexer_walk( pLexer );
+                return lol_lexer_mktok( pLexer, TOK_LEFT_ARROW, LOL_NULL, dwLine, qwPos );
+            }
+
             return lol_lexer_mktok( pLexer, TOK_LT, LOL_NULL, dwLine, qwPos );
 
         case LEXER_GT:
@@ -445,7 +531,7 @@ LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
         LEXER_CANREAD(pLexer) && 
         ( c = LEXER_READ(pLexer) ) && (
             isalnum(c) || c == LEXER_USCORE ||
-           c == LEXER_DOT || c == LEXER_SLASH || c == LEXER_NEGSIGN
+           c == LEXER_DOT || c == LEXER_FORWARD_SLASH || c == LEXER_DASH
         )
     ) {
         lol_lexer_walk( pLexer );

@@ -53,6 +53,7 @@ LoLCStr lol_op_name(LoLOpKind op) {
         case OP_OR:  return "or";
         case OP_NEG: return "unary-";
         case OP_NOT: return "not";
+        case OP_IN: return "in";
         case OP_POST_INC: return "()++";
         case OP_POST_DEC: return "()--";
         case OP_PRE_INC: return "++()";
