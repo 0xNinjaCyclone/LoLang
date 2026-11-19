@@ -124,7 +124,7 @@ static LoLToken *lol_lexer_identifier(LoLexer *pLexer, LoLDWord dwLine, LoLQWord
 
     szPtr = pLexer->sBuff;
 
-    while ( LEXER_CANREAD(pLexer) && (isalnum(c = LEXER_READ(pLexer)) || c == LEXER_USCORE) ) 
+    while ( LEXER_CANREAD(pLexer) && (isalnum(c = (unsigned char) LEXER_READ(pLexer)) || c == LEXER_USCORE) ) 
         lol_lexer_walk( pLexer );
 
     wLen = pLexer->qwPos - qwPos;
@@ -237,7 +237,7 @@ static LoLToken *lol_lexer_number(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
     if ( LEXER_CANREAD(pLexer) && LEXER_READ(pLexer) == '0' ) {
         lol_lexer_walk( pLexer );
         c = LEXER_READ( pLexer );
-        if ( isalpha(c) ) {
+        if ( isalpha((unsigned char)c) ) {
             lol_lexer_walk( pLexer );
             switch( c ) {
             case 'b':
@@ -261,7 +261,7 @@ static LoLToken *lol_lexer_number(LoLexer *pLexer, LoLDWord dwLine, LoLQWord qwP
 
     szPtr = pLexer->sBuff;
 
-    while ( LEXER_CANREAD(pLexer) && (c = LEXER_READ(pLexer)) && (isdigit(c) || c == LEXER_DOT) ) {
+    while ( LEXER_CANREAD(pLexer) && (c = LEXER_READ(pLexer)) && (isdigit((unsigned char)c) || c == LEXER_DOT) ) {
         if ( c == LEXER_DOT )
             bFloat = LOL_TRUE;
 
@@ -318,10 +318,10 @@ LoLToken *lol_lexer_scan(LoLexer *pLexer) {
 
     c = LEXER_READ( pLexer );
 
-    if ( isalpha(c) || c == LEXER_USCORE )
+    if ( isalpha((unsigned char)c) || c == LEXER_USCORE )
         return lol_lexer_identifier( pLexer, pLexer->dwLine, pLexer->qwPos );
 
-    else if ( isdigit(c) )
+    else if ( isdigit((unsigned char)c) )
         return lol_lexer_number( pLexer, pLexer->dwLine, pLexer->qwPos );
 
     else if ( c == LEXER_DQUOTE || c == LEXER_SQUOTE )
@@ -530,7 +530,7 @@ LoLToken *lol_lexer_scanpath(LoLexer *pLexer) {
     while ( 
         LEXER_CANREAD(pLexer) && 
         ( c = LEXER_READ(pLexer) ) && (
-            isalnum(c) || c == LEXER_USCORE ||
+            isalnum((unsigned char)c) || c == LEXER_USCORE ||
            c == LEXER_DOT || c == LEXER_FORWARD_SLASH || c == LEXER_DASH
         )
     ) {

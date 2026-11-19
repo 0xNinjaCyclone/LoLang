@@ -11,7 +11,7 @@ static TreeNode *lol_expr_primary(LoLParser *pParser, Tree *pLoLAst) {
 
     if ( t == TOK_ERROR ) {
         lol_err_register( pParser, pParser->pCur, pParser->pCur->value );
-        return NULL;
+        return LOL_NULL;
     }
 
     if ( t == TOK_NOTHING ) {
@@ -53,10 +53,11 @@ static TreeNode *lol_expr_primary(LoLParser *pParser, Tree *pLoLAst) {
 
     if ( t == TOK_LPAREN ) {  
         PARSER_NEXT( pParser );      
-        pNode = lol_parser_expr( pParser, pLoLAst, NULL );
+        if ( !(pNode = lol_parser_expr(pParser, pLoLAst, NULL)) )
+            return LOL_NULL;
         if ( pParser->pCur->type != TOK_RPAREN ) {
             lol_err_register( pParser, pParser->pCur, "expressions must closed with ')'" );
-            return NULL;
+            return LOL_NULL;
         }
         PARSER_NEXT( pParser );
         return pNode;
@@ -70,7 +71,8 @@ static TreeNode *lol_expr_primary(LoLParser *pParser, Tree *pLoLAst) {
         if ( pParser->pCur->type != TOK_RBRACKET )
             while ( LOL_TRUE ) {
                 lol_parser_skip( pParser );
-                lol_parser_expr( pParser, pLoLAst, pNode );
+                if ( !lol_parser_expr(pParser, pLoLAst, pNode) )
+                    return LOL_NULL;
                 if ( pParser->pCur->type != TOK_COMMA )
                     break;
                 PARSER_NEXT( pParser );
@@ -97,14 +99,15 @@ static TreeNode *lol_expr_primary(LoLParser *pParser, Tree *pLoLAst) {
                 pLoLNode = lol_parser_newnode( pParser->pCur, N_MAP_PAIR, OP_NOTHING );
                 pChild = tree_node_create( pLoLAst, &pLoLNode );
                 if ( !lol_parser_expr(pParser, pLoLAst, pChild) )
-                    return NULL;
+                    return LOL_NULL;
                 
                 if ( pParser->pCur->type != TOK_COLON ) {
                     lol_err_register( pParser, pParser->pCur, "':' expected after key" );
                 }
 
                 PARSER_NEXT( pParser );
-                lol_parser_expr( pParser, pLoLAst, pChild );
+                if ( !lol_parser_expr(pParser, pLoLAst, pChild) )
+                    return LOL_NULL;
                 tree_insert2( pLoLAst, pNode, pChild );
                 if ( pParser->pCur->type != TOK_COMMA )
                     break;
@@ -124,7 +127,7 @@ static TreeNode *lol_expr_primary(LoLParser *pParser, Tree *pLoLAst) {
     PARSER_NEXT( pParser );
     lol_err_register( pParser, pParser->pPrev, "Invalid expression!" );
 
-    return NULL;
+    return LOL_NULL;
 }
 
 static TreeNode *lol_expr_postfix(LoLParser *pParser, Tree *pLoLAst) {
@@ -152,7 +155,8 @@ static TreeNode *lol_expr_postfix(LoLParser *pParser, Tree *pLoLAst) {
                     if ( pParser->pCur->type != TOK_RPAREN )
                         while ( LOL_TRUE ) {
                             lol_parser_skip( pParser );
-                            lol_parser_expr( pParser, pLoLAst, pNode );
+                            if ( !lol_parser_expr(pParser, pLoLAst, pNode) )
+                                return LOL_NULL;
                             if ( pParser->pCur->type != TOK_COMMA )
                                 break;
                             PARSER_NEXT( pParser );
@@ -173,7 +177,8 @@ static TreeNode *lol_expr_postfix(LoLParser *pParser, Tree *pLoLAst) {
                     pLoLNode = lol_parser_newnode( pParser->pPrev, N_BINOP, OP_MUL );
                     pNode = tree_node_create( pLoLAst, &pLoLNode );
                     tree_insert2( pLoLAst, pNode, pChild );
-                    lol_parser_expr( pParser, pLoLAst, pNode );
+                    if ( !lol_parser_expr(pParser, pLoLAst, pNode) )
+                        return LOL_NULL;
                     if ( pParser->pCur->type != TOK_RPAREN ) {
                         lol_err_register( pParser, pParser->pCur, "expected ')' to close parenthesized factor" );                        
                     }
@@ -188,7 +193,8 @@ static TreeNode *lol_expr_postfix(LoLParser *pParser, Tree *pLoLAst) {
                 pLoLNode = lol_parser_newnode( pParser->pPrev, N_INDEX, OP_NOTHING );
                 pNode = tree_node_create( pLoLAst, &pLoLNode );
                 tree_insert2( pLoLAst, pNode, pChild );
-                lol_parser_expr( pParser, pLoLAst, pNode );
+                if ( !lol_parser_expr(pParser, pLoLAst, pNode) )
+                    return LOL_NULL;
                 if ( pParser->pCur->type != TOK_RBRACKET ) {
                     lol_err_register( pParser, pParser->pCur, "expected ']' to close index" );                    
                 }
@@ -255,7 +261,7 @@ static TreeNode *lol_expr_unary(LoLParser *pParser, Tree *pLoLAst) {
         
         if ( !(pNode = lol_expr_unary(pParser, pLoLAst)) ) {
             free( pLoLNode );
-            return NULL;
+            return LOL_NULL;
         }
 
         pChild = tree_node_create(pLoLAst, &pLoLNode);
@@ -280,7 +286,7 @@ static TreeNode *lol_expr_pow(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_pow(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -306,7 +312,7 @@ static TreeNode *lol_expr_term(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_pow(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -334,7 +340,7 @@ static TreeNode *lol_expr_arithmetic(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_term(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -362,7 +368,7 @@ static TreeNode *lol_expr_b_shift(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_arithmetic(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -387,7 +393,7 @@ static TreeNode *lol_expr_b_and(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_b_shift(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -413,7 +419,7 @@ static TreeNode *lol_expr_b_orxor(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_b_and(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -453,7 +459,7 @@ static TreeNode *lol_expr_relational(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_b_orxor(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -484,7 +490,7 @@ static TreeNode *lol_expr_eq(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_relational(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -510,7 +516,7 @@ static TreeNode *lol_expr_and(LoLParser *pParser, Tree *pLoLAst) {
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_eq(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -525,6 +531,11 @@ TreeNode *lol_parser_expr(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode)
     TreeNode *pRight;
     LoLNode *pLoLNode;
 
+    if ( pParser->dwExprDepth++ >= LOL_MAX_EXPR_DEPTH ) {
+        lol_err_register( pParser, pParser->pCur, "maximum expression nesting depth exceeded" );
+        return LOL_NULL;
+    }
+
     if ( pLeft = lol_expr_and(pParser, pLoLAst) ) {
         while ( pParser->pCur->type == TOK_OR ) {
             pLoLNode = lol_parser_newnode( pParser->pCur, N_BINOP, OP_OR );
@@ -533,7 +544,7 @@ TreeNode *lol_parser_expr(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode)
             tree_insert2( pLoLAst, pNode, pLeft );
             if ( !(pRight = lol_expr_and(pParser, pLoLAst)) ) {
                 tree_free( (LoLPtr) pNode );
-                return NULL;
+                return LOL_NULL;
             }
             tree_insert2( pLoLAst, pNode, pRight );
             pLeft = pNode;
@@ -542,6 +553,8 @@ TreeNode *lol_parser_expr(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode)
         if ( pAstNode )
             pLeft = tree_insert2( pLoLAst, pAstNode, pLeft );
     }
+
+    pParser->dwExprDepth--;
 
     return pLeft;
 }

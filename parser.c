@@ -224,7 +224,7 @@ static TreeNode *lol_parser_for(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAs
     lol_parser_expect( pParser, TOK_LPAREN, "'(' expected after for keyword" ); 
     if ( pParser->pCur->type != TOK_IDENT ) {
         lol_err_register( pParser, pParser->pCur, "loop variable is missing!" );
-        return NULL;
+        return LOL_NULL;
     }
     pLoLNode = lol_parser_newnode( pParser->pPrev, N_FOR, OP_NOTHING );
     pNode = tree_node_create( pLoLAst, &pLoLNode );
@@ -254,7 +254,7 @@ static TreeNode *lol_parser_for(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAs
 
 PARSER_FOR_FAIL:
     tree_free( (LoLPtr) pNode );
-    return NULL;
+    return LOL_NULL;
 }
 
 static TreeNode *lol_parser_while(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
@@ -265,7 +265,7 @@ static TreeNode *lol_parser_while(LoLParser *pParser, Tree *pLoLAst, TreeNode *p
 
     if ( pParser->pCur->type != TOK_LPAREN ) {
         lol_err_register( pParser, pParser->pCur, "'(' expected after while keyword" );
-        return NULL;
+        return LOL_NULL;
     }
 
     pLoLNode = lol_parser_newnode( pParser->pPrev, N_WHILE, OP_NOTHING );
@@ -286,7 +286,7 @@ static TreeNode *lol_parser_while(LoLParser *pParser, Tree *pLoLAst, TreeNode *p
 
 PARSER_WHILE_FAIL:
     tree_free( (LoLPtr) pNode );
-    return NULL;
+    return LOL_NULL;
 }
 
 static TreeNode *lol_parser_need(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
@@ -297,16 +297,16 @@ static TreeNode *lol_parser_need(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
 
     if ( pParser->pCur->type != TOK_PATH ) { // WTF??
         lol_err_register( pParser, pParser->pCur, "path expcted after need keyword!" );
-        return NULL;
+        return LOL_NULL;
     }
 
     pNode = lol_parser_newnode( pParser->pPrev, N_NEED, OP_NOTHING );
     if ( !(pChild = tree_insert(pLoLAst, pAstNode, &pNode)) )
-        return NULL;
+        return LOL_NULL;
 
     pNode = lol_parser_newnode( pParser->pCur, N_PATH, OP_NOTHING );
     if ( !tree_insert(pLoLAst, pChild, &pNode) )
-        return NULL;
+        return LOL_NULL;
 
     PARSER_NEXT( pParser );
     return pChild;
@@ -321,7 +321,7 @@ static TreeNode *lol_parser_ret(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAs
     PARSER_NEXT( pParser );
     if ( !(pParser->pCur->type == TOK_EOF || pParser->pCur->type == TOK_NEWLINE || pParser->pCur->type == TOK_RBRACE) )
         if ( !lol_parser_expr(pParser, pLoLAst, pNode) )
-            return NULL;
+            return LOL_NULL;
     return pNode;
 }
 
@@ -446,7 +446,7 @@ static TreeNode *lol_parser_oop_method_decl(LoLParser *pParser, Tree *pLoLAst, T
     while( pParser->pCur->type != TOK_RPAREN && pParser->pCur->type != TOK_EOF ) {
         if ( pParser->pCur->type != TOK_IDENT ) {
             lol_err_register( pParser, pParser->pCur, "expected param identifiers!" );
-            return NULL;
+            return LOL_NULL;
         }
         pLoLNode = lol_parser_newnode( pParser->pCur, N_IDENT, OP_NOTHING );
         tree_insert( pLoLAst, pNode, &pLoLNode );
@@ -632,6 +632,20 @@ static TreeNode *lol_parser_oop_class(LoLParser *pParser, Tree *pLoLAst, TreeNod
     return pNode;
 }
 
+static LoLBool lol_parser_stmt_end(LoLParser *pParser) {
+    if ( pParser->pCur->type == TOK_NEWLINE ) {
+        lol_parser_skip( pParser );
+        return LOL_TRUE;
+    }
+
+    if ( pParser->pCur->type == TOK_RBRACE ||
+        pParser->pCur->type == TOK_EOF )
+        return LOL_TRUE;
+
+    lol_err_register( pParser, pParser->pCur, "unexpected token after statement" );
+    return LOL_FALSE;
+}
+
 static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
 
     TreeNode *pNode;
@@ -646,7 +660,7 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
             /* stop/next outside a loop!? */
 
             lol_err_register( pParser, pParser->pCur, "loop control instructions can't be used outside loops" );
-            return NULL;
+            return LOL_NULL;
         }
         return lol_parser_loopctrl( pParser, pLoLAst, pAstNode );
 
@@ -670,7 +684,7 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
             /* ret outside a func!? */
 
             lol_err_register( pParser, pParser->pCur, "return instruction outside a function/method!" );
-            return NULL;
+            return LOL_NULL;
         }
 
         return lol_parser_ret( pParser, pLoLAst, pAstNode );
@@ -681,18 +695,22 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
     case TOK_CLASS:
         return lol_parser_oop_class( pParser, pLoLAst, pAstNode );
 
+    case TOK_ERROR:
+        lol_err_register( pParser, pParser->pCur, pParser->pCur->value );
+        return LOL_NULL;
+
     default:
         break;
     }
 
     if ( !(pNode = lol_parser_expr(pParser, pLoLAst, NULL)) )
-        return NULL;
+        return LOL_NULL;
         
     // if ( pParser->pCur->type == TOK_ASSIGN ) {
     //     PARSER_NEXT( pParser );
 
     //     if ( (*(LoLNode **) pNode->data)->kind != N_IDENT )
-    //         return NULL;
+    //         return LOL_NULL;
 
     //     pLoLNode = lol_parser_newnode( pParser->pPrev, N_ASSIGN, OP_NOTHING );
     //     pChild = tree_node_create( pLoLAst, &pLoLNode );
@@ -748,6 +766,9 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
         break;
 
     default:
+        if ( !lol_parser_stmt_end(pParser) )
+            return LOL_NULL;
+
         return pAstNode ? tree_insert2(pLoLAst, pAstNode, pNode) : pNode;
     }
 
@@ -757,7 +778,7 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
         pLoLNode->kind != N_MEMBER &&
         pLoLNode->kind != N_INDEX) {
 
-        return NULL;
+        return LOL_NULL;
     }
 
     /*
@@ -775,14 +796,14 @@ static TreeNode *lol_parser_stmt(LoLParser *pParser, Tree *pLoLAst, TreeNode *pA
 
     if (!pChild) {
         free( pLoLNode );
-        return NULL;
+        return LOL_NULL;
     }
 
     tree_insert2(pLoLAst, pChild, pNode);
 
-    if (!lol_parser_expr(pParser, pLoLAst, pChild)) {
+    if ( !(lol_parser_expr(pParser, pLoLAst, pChild) && lol_parser_stmt_end(pParser)) ) {
         tree_free( (LoLPtr) pChild );
-        return NULL;
+        return LOL_NULL;
     }
 
     return tree_insert2( pLoLAst, pAstNode, pChild );
@@ -794,6 +815,7 @@ LoLParser *lol_parser(LoLStr szFName) {
     if ( pParser = (LoLParser *) malloc(sizeof(LoLParser)) ) {
         pParser->dwLoopDepth = 0;
         pParser->dwFuncDepth = 0;
+        pParser->dwExprDepth = 0;
         pParser->pPrev = LOL_NULL;
         pParser->bErr = LOL_FALSE;
         pParser->pErrs = LOL_NULL;

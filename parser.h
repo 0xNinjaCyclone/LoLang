@@ -96,6 +96,7 @@ typedef struct _LoLParser {
     LoLQWord qwSize;
     LoLDWord dwLoopDepth;
     LoLDWord dwFuncDepth;
+    LoLDWord dwExprDepth;
 } LoLParser;
 
 
