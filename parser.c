@@ -43,6 +43,9 @@ static LoLVoid lol_parser_printnode(LoLPtr ppNode) {
         case N_WHILE:
             printf( "While" );
             break;
+        case N_TERNARY_COND:
+            printf("Ternary Condition");
+            break;
         case N_NEED:
             printf( "Need <%s>", (LoLStr) pLoLNode->value );
             break;

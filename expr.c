@@ -525,18 +525,13 @@ static TreeNode *lol_expr_and(LoLParser *pParser, Tree *pLoLAst) {
     return pLeft;
 }
 
-TreeNode *lol_parser_expr(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
+static TreeNode *lol_expr_or(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
     TreeNode *pNode;
     TreeNode *pLeft;
     TreeNode *pRight;
     LoLNode *pLoLNode;
 
-    if ( pParser->dwExprDepth++ >= LOL_MAX_EXPR_DEPTH ) {
-        lol_err_register( pParser, pParser->pCur, "maximum expression nesting depth exceeded" );
-        return LOL_NULL;
-    }
-
-    if ( pLeft = lol_expr_and(pParser, pLoLAst) ) {
+    if ( pLeft = lol_expr_and(pParser, pLoLAst) )
         while ( pParser->pCur->type == TOK_OR ) {
             pLoLNode = lol_parser_newnode( pParser->pCur, N_BINOP, OP_OR );
             PARSER_NEXT( pParser );
@@ -550,9 +545,75 @@ TreeNode *lol_parser_expr(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode)
             pLeft = pNode;
         }
 
-        if ( pAstNode )
-            pLeft = tree_insert2( pLoLAst, pAstNode, pLeft );
+    return pLeft;
+}
+
+static TreeNode *lol_expr_conditional(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
+    TreeNode *pNode;
+    LoLNode *pLoLNode;
+    TreeNode *pValue;
+    TreeNode *pCond;
+    TreeNode *pAlter;
+
+    if ( !(pValue = lol_expr_or(pParser, pLoLAst, pAstNode)) )
+        return LOL_NULL;
+
+    if ( pParser->pCur->type != TOK_IF )
+        return pValue;
+
+    pLoLNode = lol_parser_newnode( pParser->pCur, N_TERNARY_COND, OP_NOTHING );
+
+    PARSER_NEXT( pParser );
+
+    /* Parse the condition. */
+    if ( !(pCond = lol_expr_or(pParser, pLoLAst, pAstNode)) ) {
+        free( pLoLNode );
+        return LOL_NULL;
     }
+
+    if ( pParser->pCur->type != TOK_ELSE ) {
+        lol_err_register( pParser, pParser->pCur, "'else' expected in conditional expression" );
+        free( pLoLNode );
+        return LOL_NULL;
+    }
+
+    PARSER_NEXT( pParser );
+
+    /* Recursively parse the alternative. */
+    if ( pParser->dwExprDepth >= LOL_MAX_EXPR_DEPTH ) {
+        lol_err_register( pParser, pParser->pCur, "maximum expression nesting depth exceeded" );
+        free( pLoLNode );
+        return LOL_NULL;
+    }
+
+    pParser->dwExprDepth++;
+    pAlter = lol_expr_conditional( pParser, pLoLAst, pAstNode );
+    pParser->dwExprDepth--;
+
+    if ( !pAlter ) {
+        free( pLoLNode );
+        return LOL_NULL;
+    }
+
+    pNode = tree_node_create( pLoLAst, &pLoLNode );
+    tree_insert2( pLoLAst, pNode, pCond );
+    tree_insert2( pLoLAst, pNode, pValue );
+    tree_insert2( pLoLAst, pNode, pAlter );
+    return pNode;
+}
+
+TreeNode *lol_parser_expr(LoLParser *pParser, Tree *pLoLAst, TreeNode *pAstNode) {
+    TreeNode *pLeft;
+
+    if ( pParser->dwExprDepth++ >= LOL_MAX_EXPR_DEPTH ) {
+        lol_err_register( pParser, pParser->pCur, "maximum expression nesting depth exceeded" );
+        return LOL_NULL;
+    }
+
+    pLeft = lol_expr_conditional( pParser, pLoLAst, pAstNode );
+
+    if ( pLeft && pAstNode )
+        pLeft = tree_insert2( pLoLAst, pAstNode, pLeft );
 
     pParser->dwExprDepth--;
 

@@ -25,6 +25,7 @@ typedef enum {
     N_WHILE,
     N_NEXT,
     N_STOP,
+    N_TERNARY_COND,
     N_NEED,
     N_FUNC_DEF,
     N_RET,
